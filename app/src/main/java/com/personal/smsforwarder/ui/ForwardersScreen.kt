@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.personal.smsforwarder.core.Action
+import com.personal.smsforwarder.core.PhoneNumbers
 import com.personal.smsforwarder.core.Readiness
 import com.personal.smsforwarder.core.describe
 import com.personal.smsforwarder.data.SettingsStore
@@ -366,7 +367,12 @@ private fun ForwarderEditorDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Save") } },
+        // Saving something that cannot possibly work is not a decision worth preserving:
+        // it looks like it worked, and the failure surfaces much later as a dead forwarder.
+        confirmButton = {
+            val blocked = Readiness.configProblem(draft)?.blocksEnable == true
+            TextButton(onClick = { onSave(draft) }, enabled = !blocked) { Text("Save") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -379,6 +385,7 @@ private fun SmsRelayFields(
     onChange: (ForwarderConfig.SmsRelay) -> Unit,
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
+    val numberProblem = PhoneNumbers.problem(config.destinationNumber)
 
     Field("Name", config.name) { onChange(config.copy(name = it)) }
 
@@ -387,11 +394,18 @@ private fun SmsRelayFields(
             "Destination number",
             config.destinationNumber,
             modifier = Modifier.weight(1f),
-            isError = config.destinationNumber.isBlank(),
-            supporting = if (config.destinationNumber.isBlank()) {
-                "Required. This forwarder cannot be switched on without it."
+            isError = numberProblem != null,
+            // The reason, not just a red outline. "hahah all text" used to save happily
+            // and only failed much later, at delivery time.
+            supporting = numberProblem ?: "E.164 recommended, e.g. +15555551234",
+            trailing = if (config.destinationNumber.isEmpty()) {
+                null
             } else {
-                "E.164 recommended, e.g. +15555551234"
+                {
+                    IconButton(onClick = { onChange(config.copy(destinationNumber = "")) }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear destination number")
+                    }
+                }
             },
         ) { onChange(config.copy(destinationNumber = it)) }
 
@@ -413,7 +427,15 @@ private fun SmsRelayFields(
                         DropdownMenuItem(
                             text = { Text(number) },
                             trailingIcon = {
-                                IconButton(onClick = { onForgetNumber(number) }) {
+                                IconButton(onClick = {
+                                    onForgetNumber(number)
+                                    // Forgetting a number must also take it out of the
+                                    // field, or it sits there ready to be saved again by
+                                    // a Save the user thinks is unrelated.
+                                    if (config.destinationNumber.trim() == number) {
+                                        onChange(config.copy(destinationNumber = ""))
+                                    }
+                                }) {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Forget $number",

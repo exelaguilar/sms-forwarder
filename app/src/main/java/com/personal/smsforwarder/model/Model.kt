@@ -206,6 +206,19 @@ enum class AppIcon(val label: String) {
 data class Security(
     val appLockEnabled: Boolean = false,
     /**
+     * Blocks screenshots and the recent-apps preview **on the History tab only**.
+     *
+     * History is the one screen that holds message bodies, which means the OTP codes
+     * themselves; a screenshot of it lands in the gallery and, for most people, in a cloud
+     * photo backup — precisely what disabling Android's own backup was for. The rest of
+     * the app is configuration, so it stays capturable and people can share a rule or a
+     * bug report.
+     *
+     * Independent of [appLockEnabled] on purpose: which screen exposes what does not
+     * change based on whether a lock is armed.
+     */
+    val hideHistoryFromScreenshots: Boolean = true,
+    /**
      * How long the app may sit in the background before it re-locks.
      *
      * Not zero by default: the system permission dialog, the contact picker and the file

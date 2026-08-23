@@ -87,10 +87,12 @@ say — and every rule picks which ones it fires.
 - Optional **app lock**: fingerprint, face, or your device PIN before the app opens
 - Choose how long it may sit in the background first — instantly, or up to five minutes —
   so stepping out to a permission dialog doesn't mean authenticating again
-- While the lock is on the app stays out of the recent-apps preview, so message bodies
-  can't be read from the switcher
 - **Forwarding carries on while the app is locked.** Receiving and sending don't involve
   the screen, so a locked phone still forwards your codes.
+- Separately, **History blocks screenshots and the recent-apps preview** — it's the one
+  screen holding message bodies, and a screenshot of it goes to your gallery and usually
+  to a cloud photo backup with it. Every other screen stays capturable, so you can still
+  share a rule or a bug report. One toggle turns it off.
 
 **Yours to keep**
 
@@ -104,8 +106,9 @@ say — and every rule picks which ones it fires.
 
 **Made yours**
 
-- Material You on Android 12+, or pick any accent colour with an RGB picker — contrast is
-  enforced automatically, so no choice can make the app unreadable
+- Material You on Android 12+, or pick any accent colour — **type or paste a hex code**,
+  or nudge the RGB sliders. Contrast is enforced automatically, so no choice can make the
+  app unreadable.
 - Three app icons — blue, graphite, or light — swapped from **Settings → Appearance**
 - Destination numbers are remembered, so the second and third forwarder to the same
   handset are a dropdown rather than retyping
@@ -122,7 +125,7 @@ Requires Android 8.0 (API 26) or newer.
 phone (you'll need to allow installs from your browser or file manager) or sideload it:
 
 ```bash
-adb install -r sms-forwarder-v1.1.0.apk
+adb install -r sms-forwarder-v1.2.0.apk
 ```
 
 Or build it yourself:

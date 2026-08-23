@@ -34,17 +34,22 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.personal.smsforwarder.BuildConfig
+import com.personal.smsforwarder.core.HexColor
 import com.personal.smsforwarder.data.SettingsStore
 import com.personal.smsforwarder.model.AppIcon
 import com.personal.smsforwarder.model.Appearance
@@ -141,6 +146,23 @@ fun AppearanceScreen(store: SettingsStore, appearance: Appearance, modifier: Mod
 
         val customEnabled = !(appearance.useDynamicColor && supportsDynamic)
 
+        // The field keeps its own text, re-synced from the colour only while it is NOT
+        // focused. Syncing during typing corrupts the input: "#1F6" is valid CSS
+        // shorthand for #11FF66, so the draft was rewritten to the expanded form
+        // mid-word and the remaining characters landed inside it, leaving #11FF6B6.
+        var hexDraft by remember { mutableStateOf(HexColor.format(accent)) }
+        var hexFocused by remember { mutableStateOf(false) }
+        LaunchedEffect(accent, hexFocused) {
+            if (!hexFocused && HexColor.parse(hexDraft) != accent) {
+                hexDraft = HexColor.format(accent)
+            }
+        }
+        val hexProblem = if (HexColor.parse(hexDraft) == null) {
+            "Six hex digits, e.g. #1F6FEB"
+        } else {
+            null
+        }
+
         Text(
             "Accent colour",
             style = MaterialTheme.typography.titleMedium,
@@ -156,6 +178,7 @@ fun AppearanceScreen(store: SettingsStore, appearance: Appearance, modifier: Mod
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(vertical = 12.dp),
         ) {
             Box(
@@ -171,16 +194,23 @@ fun AppearanceScreen(store: SettingsStore, appearance: Appearance, modifier: Mod
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
-            Column(verticalArrangement = Arrangement.Center, modifier = Modifier.padding(top = 8.dp)) {
-                Text(
-                    "#%06X".format(accent),
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                )
-                Text(
-                    "R $red   G $green   B $blue",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Editable, because nobody knows their colour as three 0-255 numbers; they
+            // know it as #1F6FEB and want to paste it.
+            Field(
+                "Hex",
+                hexDraft,
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged { hexFocused = it.isFocused },
+                monospace = true,
+                enabled = customEnabled,
+                isError = hexProblem != null,
+                supporting = hexProblem ?: "R $red   G $green   B $blue",
+            ) { typed ->
+                hexDraft = typed
+                HexColor.parse(typed)?.let {
+                    store.updateAppearance(appearance.copy(accentRgb = it))
+                }
             }
         }
 
@@ -441,6 +471,37 @@ fun SecurityScreen(store: SettingsStore, security: Security, modifier: Modifier 
             }
         }
 
+        // Independent of the lock: which screen exposes what does not change based on
+        // whether a lock happens to be armed.
+        ElevatedCard(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Protect History", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Blocks screenshots and the recent-apps preview on the History " +
+                            "tab. Every other screen stays capturable, so you can still " +
+                            "share a rule or a bug report.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = security.hideHistoryFromScreenshots,
+                    onCheckedChange = {
+                        store.updateSecurity(security.copy(hideHistoryFromScreenshots = it))
+                    },
+                )
+            }
+        }
+        Text(
+            "History holds the message bodies, which means the codes themselves. A " +
+                "screenshot of it goes to your gallery, and usually into a cloud photo " +
+                "backup along with it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+
         ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Text(
@@ -452,9 +513,6 @@ fun SecurityScreen(store: SettingsStore, security: Security, modifier: Modifier 
                         "received by a broadcast receiver and sent by a background " +
                         "worker, neither of which needs the screen, so a locked phone " +
                         "still forwards your codes.\n\n" +
-                        "While the lock is on, the app is also kept out of the " +
-                        "recent-apps preview, so message bodies cannot be read from " +
-                        "there.\n\n" +
                         "This guards the app's own screens. It is not encryption: your " +
                         "settings and history are stored encrypted either way.",
                     style = MaterialTheme.typography.bodySmall,

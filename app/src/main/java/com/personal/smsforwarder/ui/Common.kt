@@ -40,6 +40,9 @@ fun Field(
     monospace: Boolean = false,
     supporting: String? = null,
     isError: Boolean = false,
+    enabled: Boolean = true,
+    /** Rendered inside the field, e.g. a clear button. */
+    trailing: (@Composable () -> Unit)? = null,
     onValueChange: (String) -> Unit,
 ) {
     OutlinedTextField(
@@ -48,6 +51,8 @@ fun Field(
         label = { Text(label) },
         singleLine = singleLine,
         isError = isError,
+        enabled = enabled,
+        trailingIcon = trailing,
         supportingText = supporting?.let { { Text(it) } },
         textStyle = if (monospace) {
             MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)

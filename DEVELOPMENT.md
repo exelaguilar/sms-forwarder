@@ -54,6 +54,8 @@ screen and the unit tests can exercise the entire pipeline without a radio or a 
 | `core/Readiness.kt` | "Will anything actually happen?" as pure functions over permissions, rules and forwarders. |
 | `core/RuleDuplicates.kt` | Whether a rule being saved already has an equivalent. Compares criteria only. |
 | `core/AppLock.kt` | When the biometric prompt should reappear. Timing only, no Android. |
+| `core/PhoneNumbers.kt` | Destination-number validation: strict about content, permissive about formatting. |
+| `core/HexColor.kt` | Parse and format for the accent colour's hex field. |
 | `core/Throwables.kt` | Flattens a cause chain into one readable line for History. |
 | `model/Model.kt` | Every data type, in one file. |
 | `data/SettingsStore.kt` | The state: rules, forwarders, history, appearance, known numbers, master switch. |
@@ -209,6 +211,31 @@ with it.
 disarm the lock on whatever device it was restored onto — the one direction a security
 setting must never travel.
 
+**Screenshot blocking follows the screen, not the lock.** FLAG_SECURE is a window flag,
+so tying it to the app lock blanked *everything* — you could not screenshot a rule to ask
+about it. History is the only tab holding message bodies, and therefore the codes, so it
+is the only one that sets the flag. The flag is cleared on dispose as well as on the false
+branch; leaving it set would silently make the whole app uncapturable after one visit.
+
+**The hex field re-syncs from the colour only while unfocused.** `#1F6` is valid CSS
+shorthand for `#11FF66`, so an unconditional sync rewrote the draft to the expanded form
+part-way through typing `#1F6FEB` and the remaining characters landed inside it, leaving
+`#11FF6B6`. Focus is the signal for "the user owns this text right now".
+
+**Destination numbers are validated on content, not shape.** `PhoneNumbers` accepts every
+formatting people paste — `+1 (806) 555-1234`, `806.555.1234`, bare digits — and rejects
+anything with letters or too few/many digits. It is not a libphonenumber substitute and
+cannot say a number is unreachable, only that it is not a number. Before this, "hahah all
+text" saved happily and the first sign of trouble was a failed delivery much later.
+
+**Save is disabled on `configProblem`, which is the permission-free half of
+`Readiness.problem`.** Gating Save on the full check would have made the button depend on
+SEND_SMS, which the editor cannot fix and which is deliberately only a warning.
+
+**Forgetting a saved number also clears it from the field.** Otherwise the number the user
+just deleted stays in the input, ready to be re-saved by a Save they think is unrelated —
+and re-added to the saved list on the way out.
+
 **Backups exclude history always and credentials by default.** History holds the codes
 themselves. `withoutSecrets` is `internal` rather than `private` specifically so the
 tests exercise the real redaction — an earlier test duplicated the logic and would have
@@ -256,6 +283,10 @@ skipped. Entries are tagged as simulated.
 - `RuleDuplicatesTest` — criterion order, number formatting, include vs exclude, and that
   a rule never reports itself as its own duplicate.
 - `AppLockTest` — grace-window timing, cold start, and time moving backwards.
+- `PhoneNumbersTest` — every formatting people paste is accepted; free text, stray
+  punctuation, and out-of-range digit counts are not.
+- `HexColorTest` — the paste forms, three-digit shorthand, and that an eight-digit alpha
+  value is rejected rather than silently truncated.
 - `ConfigBackupTest` — redaction, using the production `withoutSecrets`.
 
 ### 3. Instrumented tests

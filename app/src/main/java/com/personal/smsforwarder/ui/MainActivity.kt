@@ -89,6 +89,11 @@ private fun AppRoot(container: AppContainer, coldStart: Boolean) {
             container.store.updateSecurity(security.copy(appLockEnabled = false))
         }
 
+        // Screenshot blocking follows the screen rather than the lock. History is the only
+        // tab holding message bodies — and therefore the codes — so blanking the whole app
+        // just to protect it made rules and forwarders uncapturable for no benefit.
+        SecureWindow(security.hideHistoryFromScreenshots && tab == Tab.History)
+
         // Back closes a settings sub-page before it leaves the app.
         BackHandler(enabled = settingsPage != null) { settingsPage = null }
 
@@ -204,28 +209,12 @@ private fun rememberAppLock(
     graceSeconds: Int,
     onUnavailable: () -> Unit,
 ): AppLockState {
-    val context = LocalContext.current
     var locked by remember { mutableStateOf(enabled) }
     var backgroundedAt by remember { mutableStateOf<Long?>(null) }
 
     // Turning the setting off unlocks immediately; turning it on does not lock the screen
     // the user is currently looking at, which would be startling and pointless.
     LaunchedEffect(enabled) { if (!enabled) locked = false }
-
-    // Keep the app out of the recent-apps preview while the lock is armed, so message
-    // bodies are not readable from the switcher.
-    val activity = remember(context) { context.findActivity() }
-    DisposableEffect(enabled, activity) {
-        if (enabled) {
-            activity?.window?.setFlags(
-                WindowManager.LayoutParams.FLAG_SECURE,
-                WindowManager.LayoutParams.FLAG_SECURE,
-            )
-        } else {
-            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        }
-        onDispose { }
-    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, enabled, graceSeconds) {
@@ -258,4 +247,28 @@ private fun rememberAppLock(
             onUnavailable()
         },
     )
+}
+
+/**
+ * Applies FLAG_SECURE to the activity window while [secure] is true.
+ *
+ * The flag is per-window, not per-composable, so it has to be cleared again on the way
+ * out — leaving it set would silently make the whole app uncapturable the moment someone
+ * visited History once.
+ */
+@Composable
+private fun SecureWindow(secure: Boolean) {
+    val context = LocalContext.current
+    val window = remember(context) { context.findActivity()?.window }
+    DisposableEffect(window, secure) {
+        if (secure) {
+            window?.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE,
+            )
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
 }

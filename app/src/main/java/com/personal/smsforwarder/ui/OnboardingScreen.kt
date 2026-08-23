@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.personal.smsforwarder.core.PhoneNumbers
 import com.personal.smsforwarder.data.SettingsStore
 import com.personal.smsforwarder.model.ForwarderConfig
 
@@ -58,6 +59,10 @@ fun OnboardingScreen(store: SettingsStore, onDone: () -> Unit) {
 
     var step by remember { mutableIntStateOf(0) }
     var number by remember(relay?.id) { mutableStateOf(relay?.destinationNumber.orEmpty()) }
+
+    // Blank is a legitimate answer here — it means "I'll use a webhook or set this up
+    // later". Something that is neither blank nor a number is not.
+    val numberProblem = if (number.isBlank()) null else PhoneNumbers.problem(number)
 
     fun finish() {
         val trimmed = number.trim()
@@ -97,7 +102,7 @@ fun OnboardingScreen(store: SettingsStore, onDone: () -> Unit) {
                 when (step) {
                     0 -> WelcomeStep()
                     1 -> PermissionStep(permissions)
-                    else -> NumberStep(number, relay != null) { number = it }
+                    else -> NumberStep(number, numberProblem, relay != null) { number = it }
                 }
             }
 
@@ -111,6 +116,7 @@ fun OnboardingScreen(store: SettingsStore, onDone: () -> Unit) {
                 }
                 Button(
                     onClick = { if (step == TOTAL_STEPS - 1) finish() else step++ },
+                    enabled = numberProblem == null || step != TOTAL_STEPS - 1,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
@@ -223,7 +229,12 @@ private fun PermissionStep(permissions: PermissionsUi) {
 }
 
 @Composable
-private fun NumberStep(number: String, hasRelay: Boolean, onChange: (String) -> Unit) {
+private fun NumberStep(
+    number: String,
+    problem: String?,
+    hasRelay: Boolean,
+    onChange: (String) -> Unit,
+) {
     Text("Where should messages go?", style = MaterialTheme.typography.headlineSmall)
     Text(
         "The number of the phone you want forwarded messages to arrive on. Any handset " +
@@ -237,7 +248,8 @@ private fun NumberStep(number: String, hasRelay: Boolean, onChange: (String) -> 
         Field(
             "Destination number",
             number,
-            supporting = "E.164 recommended, e.g. +15555551234",
+            isError = problem != null,
+            supporting = problem ?: "E.164 recommended, e.g. +15555551234",
         ) { onChange(it) }
     } else {
         Text(

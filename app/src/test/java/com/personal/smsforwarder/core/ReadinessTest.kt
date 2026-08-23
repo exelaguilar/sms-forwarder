@@ -63,6 +63,29 @@ class ReadinessTest {
         assertTrue(Readiness.problem(relay.copy(destinationNumber = "   "), SmsPermissions.ALL)!!.blocksEnable)
     }
 
+    /** Free text used to save happily and only fail later, at delivery time. */
+    @Test
+    fun `a destination that is not a phone number blocks the toggle`() {
+        val problem = Readiness.problem(
+            relay.copy(destinationNumber = "hahah all text"),
+            SmsPermissions.ALL,
+        )
+        assertTrue(problem!!.blocksEnable)
+        assertTrue(problem.message.contains("usable number"))
+    }
+
+    /** configProblem is what gates Save, so it must not need permissions to answer. */
+    @Test
+    fun `configProblem ignores permissions entirely`() {
+        assertNull(Readiness.configProblem(relay))
+        assertTrue(Readiness.configProblem(relay.copy(destinationNumber = "nope"))!!.blocksEnable)
+    }
+
+    @Test
+    fun `a formatted number is accepted by the save gate`() {
+        assertNull(Readiness.configProblem(relay.copy(destinationNumber = "+1 (806) 555-1234")))
+    }
+
     /**
      * The distinction that decides whether a toggle refuses or merely warns: a permission
      * may be granted a minute from now, so switching the user's setup off would be wrong.

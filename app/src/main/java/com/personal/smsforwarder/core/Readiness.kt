@@ -80,25 +80,31 @@ object Readiness {
     /**
      * What's wrong with one forwarder, or null if it's fine.
      *
-     * [Problem.blocksEnable] is the line between the two kinds of wrong. Missing
-     * configuration is certain failure and the user can fix it right here, so the toggle
-     * refuses. A missing permission is fixed elsewhere and may be granted later, so the
-     * toggle allows it and the card says it won't run — switching someone's setup off
-     * behind their back is worse than letting them arm it early.
+     * [Problem.blocksEnable] is the line between the two kinds of wrong. Missing or
+     * unusable configuration is certain failure and the user can fix it right here, so the
+     * toggle refuses and Save is disabled. A missing permission is fixed elsewhere and may
+     * be granted later, so the toggle allows it and the card says it won't run — switching
+     * someone's setup off behind their back is worse than letting them arm it early.
      */
-    fun problem(config: ForwarderConfig, permissions: SmsPermissions): Problem? = when (config) {
-        is ForwarderConfig.SmsRelay -> when {
-            config.destinationNumber.isBlank() ->
-                Problem("No destination number set. Edit this forwarder and add one.", true)
-            !permissions.sendSms ->
-                Problem("Send SMS isn't granted, so this won't run until you grant it.", false)
-            else -> null
-        }
+    fun problem(config: ForwarderConfig, permissions: SmsPermissions): Problem? =
+        configProblem(config) ?: permissionProblem(config, permissions)
 
-        is ForwarderConfig.Http -> when {
-            config.url.isBlank() -> Problem("No URL set. Edit this forwarder and add one.", true)
-            else -> null
-        }
+    /**
+     * Only the part the editor itself can fix, so the Save button can be gated on exactly
+     * this without needing to know anything about permissions.
+     */
+    fun configProblem(config: ForwarderConfig): Problem? = when (config) {
+        is ForwarderConfig.SmsRelay ->
+            if (config.destinationNumber.isBlank()) {
+                Problem("No destination number set. Edit this forwarder and add one.", true)
+            } else {
+                PhoneNumbers.problem(config.destinationNumber)
+                    ?.let { Problem("Destination isn't a usable number: $it", true) }
+            }
+
+        is ForwarderConfig.Http ->
+            if (config.url.isBlank()) Problem("No URL set. Edit this forwarder and add one.", true)
+            else null
 
         is ForwarderConfig.Email -> when {
             config.host.isBlank() -> Problem("No SMTP host set.", true)
@@ -106,6 +112,20 @@ object Readiness {
             config.from.isBlank() -> Problem("No sender address set.", true)
             else -> null
         }
+    }
+
+    private fun permissionProblem(
+        config: ForwarderConfig,
+        permissions: SmsPermissions,
+    ): Problem? = when (config) {
+        is ForwarderConfig.SmsRelay ->
+            if (!permissions.sendSms) {
+                Problem("Send SMS isn't granted, so this won't run until you grant it.", false)
+            } else {
+                null
+            }
+
+        else -> null
     }
 
     data class Problem(val message: String, val blocksEnable: Boolean)
