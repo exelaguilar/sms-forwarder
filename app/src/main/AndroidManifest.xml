@@ -28,15 +28,59 @@
         android:theme="@style/Theme.SmsForwarder"
         android:usesCleartextTraffic="true">
 
+        <!--
+          The launcher entry lives on the aliases below, not here, so the icon can be
+          swapped at runtime. MainActivity itself is never exported: everything that
+          starts it goes through whichever alias is currently enabled.
+        -->
         <activity
             android:name=".ui.MainActivity"
+            android:exported="false"
+            android:label="@string/app_name" />
+
+        <!--
+          One alias per icon variant, exactly one enabled at a time (see AppIconManager).
+          They are aliases rather than separate activities so switching icon does not
+          create a second task or lose the back stack.
+        -->
+        <activity-alias
+            android:name=".ui.LauncherBlue"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="true"
             android:exported="true"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".ui.LauncherGraphite"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_graphite"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".ui.LauncherLight"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_light"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name=".sms.SmsReceiver"

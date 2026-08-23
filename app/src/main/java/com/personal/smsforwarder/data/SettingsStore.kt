@@ -8,6 +8,7 @@ import com.personal.smsforwarder.model.AttemptStatus
 import com.personal.smsforwarder.model.ForwarderConfig
 import com.personal.smsforwarder.model.HistoryEntry
 import com.personal.smsforwarder.model.Rule
+import com.personal.smsforwarder.model.Security
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +61,26 @@ class SettingsStore(context: Context) : HistoryRecorder {
     fun setForwardingEnabled(enabled: Boolean) {
         _forwardingEnabled.value = enabled
         prefs.putBoolean(KEY_ENABLED, enabled)
+    }
+
+    /** Biometric lock. Never carried in a config export - see [Security]. */
+    private val _security = MutableStateFlow(decode<Security>(KEY_SECURITY) ?: Security())
+    val security: StateFlow<Security> = _security.asStateFlow()
+
+    fun updateSecurity(security: Security) {
+        _security.value = security.also { persist(KEY_SECURITY, it) }
+    }
+
+    /**
+     * Whether the first-run guide has been dismissed. A flow rather than a one-off read
+     * so re-running it from Settings is the same code path as showing it on install.
+     */
+    private val _onboarded = MutableStateFlow(prefs.getBoolean(KEY_ONBOARDED, false))
+    val onboarded: StateFlow<Boolean> = _onboarded.asStateFlow()
+
+    fun setOnboarded(value: Boolean) {
+        _onboarded.value = value
+        prefs.putBoolean(KEY_ONBOARDED, value)
     }
 
     init {
@@ -221,6 +242,8 @@ class SettingsStore(context: Context) : HistoryRecorder {
         const val KEY_HISTORY = "history"
         const val KEY_APPEARANCE = "appearance"
         const val KEY_NUMBERS = "known_numbers"
+        const val KEY_SECURITY = "security"
+        const val KEY_ONBOARDED = "onboarded"
         const val MAX_HISTORY = 300
     }
 }

@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Launcher icon variants. The mark is one shape in three colourways, so a variant
+         can never be mistaken for a different app. -->
     <color name="ic_launcher_background">#1F6FEB</color>
+    <color name="ic_launcher_background_graphite">#232B36</color>
+    <color name="ic_launcher_background_light">#EDF2FA</color>
+    <color name="ic_launcher_mark">#FFFFFF</color>
 </resources>

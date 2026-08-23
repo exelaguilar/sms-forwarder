@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -27,10 +29,12 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,12 +46,15 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.personal.smsforwarder.BuildConfig
 import com.personal.smsforwarder.data.SettingsStore
+import com.personal.smsforwarder.model.AppIcon
 import com.personal.smsforwarder.model.Appearance
+import com.personal.smsforwarder.model.Security
 
 const val PROJECT_URL = "https://github.com/exelaguilar/sms-forwarder"
 
 enum class SettingsPage(val title: String, val icon: ImageVector, val summary: String) {
-    Appearance("Appearance", Icons.Default.Palette, "Accent colour and Material You"),
+    Appearance("Appearance", Icons.Default.Palette, "Accent colour, app icon, Material You"),
+    Security("Security", Icons.Default.Fingerprint, "Lock the app with biometrics"),
     Simulate(
         "Simulate an incoming SMS",
         Icons.Default.PlayArrow,
@@ -55,6 +62,7 @@ enum class SettingsPage(val title: String, val icon: ImageVector, val summary: S
     ),
     Backup("Backup & restore", Icons.Default.Save, "Export or import your configuration"),
     Permissions("Permissions", Icons.Default.Lock, "What the app needs, and why"),
+    Guide("Setup guide", Icons.Default.Explore, "Run the first-run walkthrough again"),
     About("About", Icons.Default.Info, "Version, source code, licence"),
 }
 
@@ -204,8 +212,9 @@ fun AppearanceScreen(store: SettingsStore, appearance: Appearance, modifier: Mod
             "Changes apply immediately across the app.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 24.dp),
         )
+
+        AppIconPicker(appearance.icon) { store.updateAppearance(appearance.copy(icon = it)) }
     }
 }
 
@@ -296,5 +305,163 @@ private fun AboutRow(label: String, value: String) {
             modifier = Modifier.weight(1f),
         )
         Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+// ---- App icon -------------------------------------------------------------
+
+@Composable
+private fun AppIconPicker(selected: AppIcon, onSelect: (AppIcon) -> Unit) {
+    Text(
+        "App icon",
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 24.dp),
+    )
+    // Weighted columns rather than intrinsic ones: a longer label under one variant
+    // otherwise pushes the last swatch off the right edge.
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+    ) {
+        AppIcon.entries.forEach { icon ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f).clickable { onSelect(icon) },
+            ) {
+                Box(
+                    Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (icon == selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .padding(3.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppLogo(size = 66.dp, icon = icon)
+                }
+                Text(
+                    icon.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Text(
+                    if (icon == selected) "In use" else " ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+    Text(
+        "The home screen can take a moment to redraw. Shortcuts pinned to the old icon " +
+            "will not follow the change; Android offers no way to move them.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 24.dp),
+    )
+}
+
+// ---- Security -------------------------------------------------------------
+
+/**
+ * App lock.
+ *
+ * The switch is only offered when the device can actually authenticate. Arming a lock on
+ * a phone with no screen lock and no enrolled biometric would leave clearing app data as
+ * the only way back in, which takes the rules and credentials with it.
+ */
+@Composable
+fun SecurityScreen(store: SettingsStore, security: Security, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val availability = remember { lockAvailability(context) }
+    val canArm = availability == LockAvailability.Available
+    val armed = security.appLockEnabled && canArm
+
+    Column(
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Require unlock", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        when (availability) {
+                            LockAvailability.Available ->
+                                "Fingerprint, face, or your device PIN before the app opens."
+                            LockAvailability.NoneEnrolled ->
+                                "Set a screen lock or enrol a fingerprint in system settings first."
+                            LockAvailability.Unsupported ->
+                                "This device has no screen lock or biometric to authenticate with."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = armed,
+                    enabled = canArm,
+                    onCheckedChange = { store.updateSecurity(security.copy(appLockEnabled = it)) },
+                )
+            }
+        }
+
+        Text(
+            "Ask again",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        Text(
+            "How long the app may sit in the background before it locks. The permission " +
+                "dialog, the contact picker and the file picker all count as leaving the " +
+                "app, so the shortest setting will prompt often.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Security.GRACE_CHOICES.forEach { seconds ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = armed) {
+                        store.updateSecurity(security.copy(graceSeconds = seconds))
+                    },
+            ) {
+                RadioButton(
+                    selected = security.graceSeconds == seconds,
+                    enabled = armed,
+                    onClick = { store.updateSecurity(security.copy(graceSeconds = seconds)) },
+                )
+                Text(Security.graceLabel(seconds))
+            }
+        }
+
+        ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "What the lock does, and what it does not",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    "Forwarding keeps running while the app is locked. Messages are " +
+                        "received by a broadcast receiver and sent by a background " +
+                        "worker, neither of which needs the screen, so a locked phone " +
+                        "still forwards your codes.\n\n" +
+                        "While the lock is on, the app is also kept out of the " +
+                        "recent-apps preview, so message bodies cannot be read from " +
+                        "there.\n\n" +
+                        "This guards the app's own screens. It is not encryption: your " +
+                        "settings and history are stored encrypted either way.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
     }
 }

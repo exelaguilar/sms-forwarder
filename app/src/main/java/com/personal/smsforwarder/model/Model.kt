@@ -179,6 +179,54 @@ sealed interface ForwarderConfig {
 }
 
 /**
+ * Launcher icon variants. Each is an `<activity-alias>` in the manifest, swapped with
+ * PackageManager; see [com.personal.smsforwarder.data.AppIconManager] for why that
+ * matters more than it looks like it should.
+ */
+@Serializable
+enum class AppIcon(val label: String) {
+    @SerialName("blue")
+    Blue("Blue"),
+
+    @SerialName("graphite")
+    Graphite("Graphite"),
+
+    @SerialName("light")
+    Light("Light"),
+}
+
+/**
+ * Device-local security settings.
+ *
+ * Deliberately **not** part of a config export: a backup carrying "app lock off" would
+ * silently disarm the lock on whatever device it was restored onto, which is the one
+ * direction a security setting must never travel.
+ */
+@Serializable
+data class Security(
+    val appLockEnabled: Boolean = false,
+    /**
+     * How long the app may sit in the background before it re-locks.
+     *
+     * Not zero by default: the system permission dialog, the contact picker and the file
+     * picker all background the activity, so an instant re-lock means authenticating
+     * again in the middle of a task you started from inside the app.
+     */
+    val graceSeconds: Int = 30,
+) {
+    companion object {
+        val GRACE_CHOICES = listOf(0, 15, 30, 60, 300)
+
+        fun graceLabel(seconds: Int): String = when {
+            seconds <= 0 -> "Immediately"
+            seconds < 60 -> "After ${seconds}s away"
+            seconds == 60 -> "After 1 minute away"
+            else -> "After ${seconds / 60} minutes away"
+        }
+    }
+}
+
+/**
  * Theme settings. [accentRgb] is a plain 0xRRGGBB value so the picker can treat it as
  * three channels; alpha is always opaque.
  */
@@ -187,6 +235,7 @@ data class Appearance(
     /** Material You. Ignored below Android 12, which has no dynamic palette. */
     val useDynamicColor: Boolean = true,
     val accentRgb: Int = DEFAULT_ACCENT,
+    val icon: AppIcon = AppIcon.Blue,
 ) {
     companion object {
         const val DEFAULT_ACCENT = 0x6750A4

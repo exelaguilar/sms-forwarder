@@ -16,13 +16,13 @@ your iPhone, laptop, or desk. This forwards it in seconds, with no service in th
     <td><img src="docs/screenshots/rules.png" width="190" alt="Rules screen"></td>
     <td><img src="docs/screenshots/forwarders.png" width="190" alt="Forwarders screen"></td>
     <td><img src="docs/screenshots/history.png" width="190" alt="History screen"></td>
-    <td><img src="docs/screenshots/appearance.png" width="190" alt="Appearance settings"></td>
+    <td><img src="docs/screenshots/security.png" width="190" alt="Security settings"></td>
   </tr>
   <tr>
     <td align="center"><sub><b>Rules</b></sub></td>
     <td align="center"><sub><b>Forwarders</b></sub></td>
     <td align="center"><sub><b>History</b></sub></td>
-    <td align="center"><sub><b>Appearance</b></sub></td>
+    <td align="center"><sub><b>Security</b></sub></td>
   </tr>
 </table>
 
@@ -53,6 +53,8 @@ say — and every rule picks which ones it fires.
   *which half* of a rule failed
 - Reorder rules; order decides which one is credited when two would deliver the same thing
 - Any rule can fire any combination of forwarders
+- Save a rule that already has an equivalent and the app says so, naming the existing
+  rule — and tells you whether it fires the same forwarders or different ones
 
 **Delivery you can actually verify**
 
@@ -66,6 +68,29 @@ say — and every rule picks which ones it fires.
   silent one — plus a Retry button on any failed attempt
 - **Global pause** for when you're travelling or lending the phone. Messages are still
   matched and logged, so you can see what you missed; nothing is delivered.
+
+**It tells you when it isn't working**
+
+- A three-step guide on first launch: what it does, the permissions it needs, and the
+  number to forward to. Skippable, and re-runnable any time from **Settings → Setup guide**.
+- If the SMS permissions aren't granted, a banner on Rules and Forwarders says so in plain
+  words, with a one-tap fix. If Android has stopped showing the permission dialog — which
+  it does after two refusals — the button becomes **Open app settings** instead of a button
+  that does nothing.
+- A forwarder that can't possibly work says why on its own card. One with no destination
+  number *refuses* to switch on and opens its editor instead, because that one is certain
+  to fail and you can fix it right there. A missing permission only warns, because you
+  might grant it in a minute and nobody's setup should switch itself off in the meantime.
+
+**Locked when you want it**
+
+- Optional **app lock**: fingerprint, face, or your device PIN before the app opens
+- Choose how long it may sit in the background first — instantly, or up to five minutes —
+  so stepping out to a permission dialog doesn't mean authenticating again
+- While the lock is on the app stays out of the recent-apps preview, so message bodies
+  can't be read from the switcher
+- **Forwarding carries on while the app is locked.** Receiving and sending don't involve
+  the screen, so a locked phone still forwards your codes.
 
 **Yours to keep**
 
@@ -81,6 +106,7 @@ say — and every rule picks which ones it fires.
 
 - Material You on Android 12+, or pick any accent colour with an RGB picker — contrast is
   enforced automatically, so no choice can make the app unreadable
+- Three app icons — blue, graphite, or light — swapped from **Settings → Appearance**
 - Destination numbers are remembered, so the second and third forwarder to the same
   handset are a dropdown rather than retyping
 - Duplicate suppression: when several rules match one message, the same destination is
@@ -96,7 +122,7 @@ Requires Android 8.0 (API 26) or newer.
 phone (you'll need to allow installs from your browser or file manager) or sideload it:
 
 ```bash
-adb install -r sms-forwarder-v1.0.0.apk
+adb install -r sms-forwarder-v1.1.0.apk
 ```
 
 Or build it yourself:
@@ -111,17 +137,27 @@ Or build it yourself:
 
 ## Quick start
 
-1. **Settings → Permissions** → grant SMS permissions. Nothing is forwarded until you do.
-2. **Forwarders tab** → set the destination number on the SMS relay, or configure a
-   webhook / email forwarder and switch it on.
-3. **Rules tab** → the OTP and bank rules are on by default. Use *Test this pattern* in
+<img src="docs/screenshots/onboarding.png" width="190" align="right" alt="First-run guide">
+
+The app walks you through the first three steps on launch — what it does, granting the SMS
+permissions, and the number to forward to. You can skip it and come back later from
+**Settings → Setup guide**.
+
+After that:
+
+1. **Rules tab** → the OTP and bank rules are on by default. Use *Test this pattern* in
    the rule editor to try a message against your edits without sending anything.
-4. **Settings → Simulate an incoming SMS** → runs the whole pipeline for real.
-5. Send yourself a real SMS and check the **History tab**.
+2. **Settings → Simulate an incoming SMS** → runs the whole pipeline for real.
+3. Send yourself a real SMS and check the **History tab**.
+
+If anything is missing, you won't have to go looking: a banner on Rules and Forwarders
+names the problem and offers the fix.
 
 > Both default rules are on, so a matching message costs one relay SMS each. Turn the
 > bank rule off, narrow it, or use the global pause on the Rules tab if that isn't what
 > you want.
+
+<br clear="right">
 
 ---
 
@@ -139,13 +175,17 @@ This app exists because forwarding OTP codes through someone else's server is a 
   copied off the device.
 - **Four required permissions, all load-bearing.** `RECEIVE_SMS` and `READ_SMS` to see
   messages, `SEND_SMS` only for the relay forwarder, `INTERNET` for webhook and email.
+- **Optional app lock.** Biometrics or your device PIN before the app opens, and the app
+  is hidden from the recent-apps preview while it's armed. It guards the app's screens; it
+  is not what encrypts your data, which happens either way.
 - **Two optional ones, never requested until used.** `READ_CONTACTS` only if you want a
   name next to an incoming number, `POST_NOTIFICATIONS` only if you want failure alerts.
   Decline either and everything else works unchanged. Matching a rule against a contact
   needs no permission at all — contacts are picked, not read.
 
-The whole codebase is around 1,500 lines of Kotlin, deliberately kept small enough to
-read in one sitting.
+About 4,000 lines of Kotlin excluding comments and imports, in 41 files, with no
+dependency injection framework and no database. It is meant to be readable end to
+end rather than merely open source.
 
 ## Good to know
 

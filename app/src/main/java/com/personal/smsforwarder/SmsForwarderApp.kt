@@ -3,6 +3,7 @@ package com.personal.smsforwarder
 import android.app.Application
 import android.content.Context
 import com.personal.smsforwarder.core.MessageProcessor
+import com.personal.smsforwarder.data.AppIconManager
 import com.personal.smsforwarder.data.ContactResolver
 import com.personal.smsforwarder.data.FailureNotifier
 import com.personal.smsforwarder.data.SettingsStore
@@ -19,6 +20,9 @@ class AppContainer(context: Context) {
 
     val store = SettingsStore(context)
     val forwarders = ForwarderFactory(context.applicationContext)
+
+    /** Swaps the launcher icon between the manifest's activity-aliases. */
+    val icons = AppIconManager(context.applicationContext)
 
     /** Returns null for everything until the user grants contacts access. */
     val contacts = ContactResolver(context.applicationContext)

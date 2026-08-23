@@ -51,6 +51,9 @@ screen and the unit tests can exercise the entire pipeline without a radio or a 
 | `core/TemplateRenderer.kt` | `{sender}` `{body}` `{timestamp}` `{rule_name}` substitution, JSON-escaping when the target is JSON. |
 | `core/Defaults.kt` | Seed rules and forwarders. |
 | `core/DeliveryKey.kt` | Destination + rendered payload, used to suppress duplicate deliveries. |
+| `core/Readiness.kt` | "Will anything actually happen?" as pure functions over permissions, rules and forwarders. |
+| `core/RuleDuplicates.kt` | Whether a rule being saved already has an equivalent. Compares criteria only. |
+| `core/AppLock.kt` | When the biometric prompt should reappear. Timing only, no Android. |
 | `core/Throwables.kt` | Flattens a cause chain into one readable line for History. |
 | `model/Model.kt` | Every data type, in one file. |
 | `data/SettingsStore.kt` | The state: rules, forwarders, history, appearance, known numbers, master switch. |
@@ -59,11 +62,16 @@ screen and the unit tests can exercise the entire pipeline without a radio or a 
 | `data/ConfigBackup.kt` | Export/import. Redaction of credentials lives here. |
 | `data/ContactResolver.kt` | Optional reverse lookup from a number to a contact name. |
 | `data/FailureNotifier.kt` | Notifies on terminal delivery failures only. |
+| `data/AppIconManager.kt` | Enables one launcher `<activity-alias>` and disables the rest. |
 | `forwarder/*.kt` | The three `Forwarder` implementations plus the factory. |
 | `work/ForwardWorker.kt` | One WorkManager job per (rule → forwarder) pair. |
 | `ui/MainActivity.kt` | Four bottom tabs; Settings hosts sub-pages with back handling. |
 | `ui/Theme.kt` | Material You, or a scheme derived from the user's accent colour. |
-| `ui/SettingsScreen.kt` | Settings hub, appearance picker, About. |
+| `ui/SettingsScreen.kt` | Settings hub, appearance and app-icon pickers, security, About. |
+| `ui/PermissionState.kt` | Live permission state, re-read on resume; detects permanent denial. |
+| `ui/OnboardingScreen.kt` | The three-step first-run guide, also re-runnable from Settings. |
+| `ui/LockScreen.kt` | Biometric / device-credential gate and its availability check. |
+| `ui/ReadinessBanner.kt` | Renders `Readiness` issues with a one-tap fix. |
 | `ui/Splash.kt` | Cold-start logo animation, shared logo composable. |
 | `ui/*.kt` | The remaining Compose screens: Rules, Forwarders, History, Simulate, Permissions. |
 
@@ -163,6 +171,44 @@ one that matched nothing, so it is recorded and marked.
 **Only terminal failures notify.** A retrying attempt may still succeed, and a
 notification per attempt trains you to dismiss them.
 
+**Missing configuration blocks; a missing permission only warns.** `Readiness.problem`
+draws that line. A relay with no destination number is certain to fail and the user can
+fix it right there, so the toggle refuses and opens the editor. A missing permission is
+fixed in another app and may be granted a minute later, so the toggle allows it and the
+card says it will not run — switching someone's setup off behind their back is worse than
+letting them arm it early.
+
+**Duplicate *rules* are detected on criteria only, never on forwarders.** Two rules with
+identical criteria and different forwarders is a legitimate "the same messages, also to
+email", so the dialog says which case it is and lets you save. Numbers are compared by
+digits, so `+1 (806) 555-1234` and `18065551234` are recognised as one rule rather than
+quietly coexisting.
+
+**`androidx.fragment` is pinned to 1.8.5.** `biometric:1.1.0` resolves fragment 1.2.x,
+whose `FragmentActivity` rejects any permission request code above 16 bits — and the
+activity-result APIs generate exactly those. Every runtime permission request crashed with
+"Can only use lower 16 bits for requestCode" the moment MainActivity became a
+FragmentActivity. Removing the pin brings the crash straight back.
+
+**The biometric prompt is shown from `lifecycle.withResumed`.** Calling `authenticate()`
+any earlier — which is exactly what happens when the lock engages from `ON_START` —
+displays the prompt and then immediately cancels it, leaving "Authentication canceled" on
+screen and the user pressing Unlock by hand every single time.
+
+**The new launcher alias is enabled before the old ones are disabled.** The other order
+leaves a window with no enabled launcher component; a launcher that refreshes inside it
+drops the app from the home screen. `DONT_KILL_APP` is equally load-bearing: without it
+the process dies mid-tap, which reads as a crash to whoever just changed a setting.
+
+**App lock is never armed without `lockAvailability` returning `Available`,** and the lock
+screen disarms itself if authentication becomes impossible later. A lock with no way past
+it would leave clearing app data as the only recovery, taking the rules and credentials
+with it.
+
+**`Security` is excluded from config export.** A backup carrying "app lock off" would
+disarm the lock on whatever device it was restored onto — the one direction a security
+setting must never travel.
+
 **Backups exclude history always and credentials by default.** History holds the codes
 themselves. `withoutSecrets` is `internal` rather than `private` specifically so the
 tests exercise the real redaction — an earlier test duplicated the logic and would have
@@ -205,6 +251,12 @@ skipped. Entries are tagged as simulated.
   dispatch behaviour (disabled rules and forwarders, unknown IDs, multiple rules).
 - `TemplateRendererTest` — substitution, JSON escaping (the rendered body is re-parsed by
   a strict JSON parser), and `$`/`\` in message bodies.
+- `ReadinessTest` — every permission and configuration combination, including the
+  block-versus-warn line that decides whether a toggle refuses.
+- `RuleDuplicatesTest` — criterion order, number formatting, include vs exclude, and that
+  a rule never reports itself as its own duplicate.
+- `AppLockTest` — grace-window timing, cold start, and time moving backwards.
+- `ConfigBackupTest` — redaction, using the production `withoutSecrets`.
 
 ### 3. Instrumented tests
 
@@ -216,6 +268,12 @@ skipped. Entries are tagged as simulated.
 the multi-part case), packs them into an intent exactly as the platform does, and
 dispatches to the real `SmsReceiver`. This validates PDU decoding and multi-part
 concatenation, which the simulator skips.
+
+`AppIconManagerTest` exists because the alias name is a string built in Kotlin
+(`"${packageName}.ui.Launcher${icon.name}"`) that has to match an `<activity-alias>` in
+the manifest. Nothing on the JVM can tell you whether those two agree. It asserts every
+variant applies and reads back, and that **exactly one** alias is enabled after each
+switch — zero would take the app off the home screen with no way back.
 
 `TemplateRendererAndroidTest` exists because **JVM unit tests cannot catch Android regex
 bugs**. Android's `java.util.regex` is ICU-backed and stricter than the JVM's: an

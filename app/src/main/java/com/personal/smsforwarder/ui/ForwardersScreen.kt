@@ -46,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.personal.smsforwarder.core.Action
+import com.personal.smsforwarder.core.Readiness
 import com.personal.smsforwarder.core.describe
 import com.personal.smsforwarder.data.SettingsStore
 import com.personal.smsforwarder.forwarder.ForwarderFactory
@@ -64,7 +66,9 @@ fun ForwardersScreen(
     modifier: Modifier = Modifier,
 ) {
     val forwarders by store.forwarders.collectAsState()
+    val rules by store.rules.collectAsState()
     val savedNumbers by store.knownNumbers.collectAsState()
+    val permissions = rememberPermissions()
     var editing by remember { mutableStateOf<ForwarderConfig?>(null) }
     var addMenuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -120,10 +124,38 @@ fun ForwardersScreen(
                         "several webhooks pointed at different URLs.",
                 )
             }
+            item {
+                ReadinessBanner(
+                    issues = Readiness.issues(permissions.sms, forwarders, rules),
+                    onFix = { issue ->
+                        when (issue.action) {
+                            Action.GrantPermissions ->
+                                if (permissions.mustUseSettings) permissions.openAppSettings()
+                                else permissions.requestSms()
+
+                            Action.ConfigureForwarder ->
+                                editing = forwarders.firstOrNull { it.id == issue.forwarderId }
+
+                            else -> Unit
+                        }
+                    },
+                )
+            }
             items(forwarders, key = { it.id }) { config ->
                 ForwarderCard(
                     config = config,
-                    onToggle = { store.upsertForwarder(config.withEnabled(it)) },
+                    problem = Readiness.problem(config, permissions.sms),
+                    // Configuration that cannot work refuses to arm and opens the editor
+                    // instead; a missing permission only warns, because it is fixed
+                    // elsewhere and may well be granted in a minute.
+                    onToggle = { want ->
+                        val problem = Readiness.problem(config, permissions.sms)
+                        if (want && problem?.blocksEnable == true) {
+                            editing = config
+                        } else {
+                            store.upsertForwarder(config.withEnabled(want))
+                        }
+                    },
                     onEdit = { editing = config },
                     onDelete = { store.deleteForwarder(config.id) },
                     elapsedSeconds = if (testingId == config.id) elapsed else null,
@@ -209,6 +241,7 @@ private fun ForwarderConfig.summary(): String = when (this) {
 @Composable
 private fun ForwarderCard(
     config: ForwarderConfig,
+    problem: Readiness.Problem?,
     elapsedSeconds: Int?,
     progressText: String?,
     lastResult: String?,
@@ -229,6 +262,14 @@ private fun ForwarderCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (problem != null) {
+                        Text(
+                            problem.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     Row(Modifier.padding(top = 6.dp)) {
                         if (config is ForwarderConfig.SmsRelay) {
                             Badge(
@@ -346,7 +387,12 @@ private fun SmsRelayFields(
             "Destination number",
             config.destinationNumber,
             modifier = Modifier.weight(1f),
-            supporting = "E.164 recommended, e.g. +15555551234",
+            isError = config.destinationNumber.isBlank(),
+            supporting = if (config.destinationNumber.isBlank()) {
+                "Required. This forwarder cannot be switched on without it."
+            } else {
+                "E.164 recommended, e.g. +15555551234"
+            },
         ) { onChange(config.copy(destinationNumber = it)) }
 
         // Numbers already used elsewhere, so a second or third forwarder to the same

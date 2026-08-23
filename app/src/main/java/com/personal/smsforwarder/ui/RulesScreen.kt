@@ -53,6 +53,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.personal.smsforwarder.core.Defaults
+import com.personal.smsforwarder.core.Action
+import com.personal.smsforwarder.core.Readiness
+import com.personal.smsforwarder.core.RuleDuplicates
 import com.personal.smsforwarder.core.RuleMatcher
 import com.personal.smsforwarder.data.SettingsStore
 import com.personal.smsforwarder.model.ForwarderConfig
@@ -62,11 +65,19 @@ import com.personal.smsforwarder.model.SenderCriterion
 import com.personal.smsforwarder.model.SenderMatch
 
 @Composable
-fun RulesScreen(store: SettingsStore, modifier: Modifier = Modifier) {
+fun RulesScreen(
+    store: SettingsStore,
+    modifier: Modifier = Modifier,
+    onOpenForwarders: () -> Unit = {},
+) {
     val rules by store.rules.collectAsState()
     val forwarders by store.forwarders.collectAsState()
     val forwardingEnabled by store.forwardingEnabled.collectAsState()
+    val permissions = rememberPermissions()
     var editing by remember { mutableStateOf<Rule?>(null) }
+    // A rule the user asked to save that already has an equivalent; held here until they
+    // confirm, so the editor stays open behind the warning if they decide against it.
+    var duplicate by remember { mutableStateOf<Pair<Rule, Rule>?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -120,6 +131,24 @@ fun RulesScreen(store: SettingsStore, modifier: Modifier = Modifier) {
                     }
                 }
             }
+            item {
+                ReadinessBanner(
+                    issues = Readiness.issues(permissions.sms, forwarders, rules),
+                    onFix = { issue ->
+                        when (issue.action) {
+                            Action.GrantPermissions ->
+                                if (permissions.mustUseSettings) permissions.openAppSettings()
+                                else permissions.requestSms()
+
+                            // The forwarder editor lives on the other tab, so send them
+                            // there rather than leaving a button that does nothing.
+                            Action.ConfigureForwarder -> onOpenForwarders()
+
+                            else -> Unit
+                        }
+                    },
+                )
+            }
             itemsIndexed(rules, key = { _, rule -> rule.id }) { index, rule ->
                 RuleCard(
                     rule = rule,
@@ -140,12 +169,73 @@ fun RulesScreen(store: SettingsStore, modifier: Modifier = Modifier) {
             rule = rule,
             forwarders = forwarders,
             onDismiss = { editing = null },
-            onSave = {
-                store.upsertRule(it)
+            onSave = { candidate ->
+                val existing = RuleDuplicates.findDuplicate(candidate, rules)
+                if (existing != null) {
+                    duplicate = candidate to existing
+                } else {
+                    store.upsertRule(candidate)
+                    editing = null
+                }
+            },
+        )
+    }
+
+    duplicate?.let { (candidate, existing) ->
+        DuplicateRuleDialog(
+            candidate = candidate,
+            existing = existing,
+            onDismiss = { duplicate = null },
+            onSaveAnyway = {
+                store.upsertRule(candidate)
+                duplicate = null
                 editing = null
             },
         )
     }
+}
+
+/**
+ * Shown when a rule being saved matches exactly the same messages as one that already
+ * exists. Not a block: identical criteria with different forwarders is a legitimate
+ * "the same messages, also to email", and only the user knows which case this is.
+ */
+@Composable
+private fun DuplicateRuleDialog(
+    candidate: Rule,
+    existing: Rule,
+    onDismiss: () -> Unit,
+    onSaveAnyway: () -> Unit,
+) {
+    val sameDestinations = RuleDuplicates.sameDestinations(candidate, existing)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("There is already a rule for that") },
+        text = {
+            Column {
+                Text(
+                    "“${existing.name}” already matches exactly the same messages: " +
+                        "same sender criteria, same body pattern."
+                )
+                Text(
+                    if (sameDestinations) {
+                        "It also fires the same forwarders, so this rule would be a pure " +
+                            "duplicate. Deliveries to the same destination are collapsed " +
+                            "anyway, so the second rule would simply never be credited in " +
+                            "History."
+                    } else {
+                        "It fires different forwarders, so saving this is a reasonable way " +
+                            "to send the same messages somewhere else as well."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onSaveAnyway) { Text("Save anyway") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep editing") } },
+    )
 }
 
 @Composable

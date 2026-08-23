@@ -39,11 +39,13 @@ fun SimulatorScreen(processor: MessageProcessor, modifier: Modifier = Modifier) 
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
     ) {
-        ScreenHeader(
-            "Simulate an SMS",
+        Text(
             "The whole pipeline: every enabled rule is evaluated and matching forwarders " +
                 "really fire — an SMS relay sends a real, billable message. To check a " +
                 "pattern without sending anything, use Test this pattern in the rule editor.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 12.dp),
         )
         Field("Sender", sender) { sender = it }
         Field("Body", body, singleLine = false) { body = it }

@@ -27,20 +27,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.personal.smsforwarder.R
+import com.personal.smsforwarder.model.AppIcon
 import kotlinx.coroutines.delay
 
-/** The launcher icon's artwork on its brand-blue disc, reused by the splash and About. */
+/**
+ * The background colour and foreground drawable behind each launcher variant.
+ *
+ * Duplicated from the adaptive-icon XML on purpose: those resources are compiled for the
+ * launcher and cannot be read back as a colour and a layer, so the picker would otherwise
+ * have nothing to preview.
+ */
+data class IconArt(val background: Color, val foreground: Int)
+
+fun iconArt(icon: AppIcon): IconArt = when (icon) {
+    AppIcon.Blue -> IconArt(Color(0xFF1F6FEB), R.drawable.ic_launcher_foreground)
+    AppIcon.Graphite -> IconArt(Color(0xFF232B36), R.drawable.ic_launcher_foreground_graphite)
+    AppIcon.Light -> IconArt(Color(0xFFEDF2FA), R.drawable.ic_launcher_foreground_light)
+}
+
+/**
+ * The launcher icon's artwork on its disc, reused by the splash, About and onboarding.
+ * Follows the chosen variant, so the in-app logo always matches the home screen.
+ */
 @Composable
-fun AppLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+fun AppLogo(
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    icon: AppIcon = LocalAppIcon.current,
+) {
+    val art = iconArt(icon)
     Box(
         modifier
             .size(size)
             .clip(CircleShape)
-            .background(Color(0xFF1F6FEB)),
+            .background(art.background),
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground),
+            painter = painterResource(art.foreground),
             contentDescription = null,
             modifier = Modifier.size(size),
         )

@@ -26,8 +26,8 @@ android {
         applicationId = "com.personal.smsforwarder"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -102,6 +102,17 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Biometric / device-credential prompt for the optional app lock. Its prompt is a
+    // fragment, which is why MainActivity is a FragmentActivity.
+    implementation("androidx.biometric:biometric:1.1.0")
+
+    // Not optional. biometric:1.1.0 resolves androidx.fragment 1.2.x, whose
+    // FragmentActivity still rejects any permission request code above 16 bits - and the
+    // activity-result APIs generate exactly those, so every runtime permission request
+    // crashes with "Can only use lower 16 bits for requestCode". Fragment 1.3+ dropped
+    // the check. Verified by the app dying on the onboarding Grant button.
+    implementation("androidx.fragment:fragment:1.8.5")
 
     // Encrypted storage for webhook URLs/headers and SMTP credentials.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")

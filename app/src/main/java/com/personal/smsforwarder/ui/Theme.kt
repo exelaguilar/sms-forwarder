@@ -9,10 +9,19 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import com.personal.smsforwarder.model.AppIcon
 import com.personal.smsforwarder.model.Appearance
+
+/**
+ * The chosen launcher-icon variant, so every in-app rendering of the logo matches the one
+ * on the home screen without each screen having to be handed the setting.
+ */
+val LocalAppIcon = staticCompositionLocalOf { AppIcon.Blue }
 
 /** 0xRRGGBB stored in settings -> an opaque Compose colour. */
 fun Int.toAccentColor(): Color = Color(0xFF000000L.toInt() or this)
@@ -30,7 +39,9 @@ fun AppTheme(appearance: Appearance, content: @Composable () -> Unit) {
         else -> accentScheme(appearance.accentRgb.toAccentColor(), dark)
     }
 
-    MaterialTheme(colorScheme = scheme, content = content)
+    CompositionLocalProvider(LocalAppIcon provides appearance.icon) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }
 
 /**
