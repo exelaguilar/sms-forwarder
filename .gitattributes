@@ -1,0 +1,12 @@
+# Normalise line endings so the repo is consistent regardless of who clones it.
+* text=auto eol=lf
+
+# gradlew is a shell script: CRLF would break it on Linux and macOS.
+gradlew text eol=lf
+
+# Windows scripts need CRLF.
+*.bat text eol=crlf
+
+# Never touch binaries.
+*.jar binary
+*.png binary

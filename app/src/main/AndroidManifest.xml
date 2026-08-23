@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Receive and read the incoming SMS we forward. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- SMS relay forwarder (plain SMS via the device's own carrier connection). -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- HTTP + SMTP forwarders. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      Optional, and never requested unless you turn on contact names. Used only to turn an
+      incoming number into a name for {contact} / {sender_label}. Matching a rule against a
+      contact does NOT need this: those are picked with ACTION_PICK and matched by number.
+    -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Optional. Only used to tell you when a forward has finally failed. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".SmsForwarderApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SmsForwarder"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

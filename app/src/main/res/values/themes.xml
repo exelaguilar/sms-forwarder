@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose draws everything; this is only the window shell.
+         android:Theme.DeviceDefault.DayNight needs API 29, so see values-v29. -->
+    <style name="Theme.SmsForwarder" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>
